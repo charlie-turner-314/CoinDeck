@@ -1,0 +1,23 @@
+.navbar {
+  width: 60px;
+  height: 100%;
+  position: fixed;
+  background-color: rgba(200, 0, 120, 0.9);
+}
+
+.nav-item {
+  width: 50px;
+  margin: 5px;
+  border-radius: 5px;
+  background-color: limegreen;
+  height: 50px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.nav-item > img {
+  width: 90%;
+  height: 90%;
+  margin: 5%;
+  filter: invert(1);
+}

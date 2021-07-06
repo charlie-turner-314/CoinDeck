@@ -1,0 +1,16 @@
+.deck {
+  background-color: rgb(50, 50, 50);
+  min-width: 250px;
+}
+
+.menu-bar {
+  height: 20px;
+  display: flex;
+}
+
+.menu-bar > img {
+  margin-left: auto;
+  margin-right: 10px;
+  height: 100%;
+  width: auto;
+}
