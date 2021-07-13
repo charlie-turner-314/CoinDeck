@@ -1,64 +1,93 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { produce } from "immer";
 import Deck from "./components/Deck";
 import "./App.css";
 import Navbar from "./components/Navbar";
-import { DeckInfo } from "./types/DeckInfo";
-import socketIOClient from "socket.io-client";
+import { socket } from "./services/socket";
+
+interface deckInfo {
+  [index: string]: {
+    tweets: number[];
+    coinData: {};
+    loading: boolean;
+  };
+}
 
 function App() {
-  const [decks, setDecks] = useState<DeckInfo[]>([
-    {
-      coin: "bitcoin",
-      tweet: { author: "author", text: "this is the cool text" },
-    },
-  ]);
+  const [decks, setDecks] = useState<deckInfo>({});
 
-  const addDeck = () => {
-    let coinId = prompt("whats the id") as string;
-    setDecks([
-      ...decks,
-      {
-        coin: coinId,
-        tweet: {
-          author: "elon",
-          text: `${Math.random()} is the randoom number`,
-        },
-      },
-    ]);
+  const addDeck = (coinId: string = "_null") => {
+    if (coinId === "_null") coinId = prompt("whats the symbol pair") as string;
+    const searchTerm = prompt("search term:") as string;
+    if (coinId === "") return console.error("Not a string");
+    if (searchTerm === "") return console.error("Not a string");
+    setDecks((d) =>
+      produce(d, (decksCopy: any) => {
+        decksCopy[coinId] = { tweets: [], coinData: {}, loading: true };
+      })
+    );
+    if (!(coinId === "global")) {
+      socket.emit("add_rule", [coinId, searchTerm]);
+    }
   };
 
-  const removeDeck = (id: number) => {
-    console.log("remove");
-    const newDecks = produce(decks, (decksCopy) => {
-      decksCopy.splice(id, 1);
+  const removeDeck = (id: string) => {
+    if (!(id === "global")) socket.emit("delete_rule", id);
+    const newDecks = produce(decks, (decksCopy: any) => {
+      delete decksCopy[id];
     });
     setDecks(newDecks);
   };
 
   useEffect(() => {
-    let socket;
-
-    if (process.env.NODE_ENV === "development") {
-      socket = socketIOClient("http://localhost:3001/");
-    } else {
-      socket = socketIOClient("/");
-    }
+    socket.on("connect", () => {
+      console.log("Connected to server...");
+    });
+    socket.on("tweet", (tweet_json) => {
+      const matching_deck: string = tweet_json.matching_rules[0].tag; // String with coinId (from when the rule was set)
+      setDecks((d) =>
+        produce(d, (decksCopy) => {
+          if (matching_deck in decksCopy) {
+            decksCopy[matching_deck].tweets.unshift(tweet_json.data.id);
+          }
+          return decksCopy;
+        })
+      );
+    });
+    socket.on("price_update", (data) => {
+      setDecks((d) =>
+        produce(d, (decksCopy) => {
+          try {
+            decksCopy[data.symbol].coinData = data;
+            decksCopy[data.symbol].loading = false;
+          } catch (err) {
+            console.error(err);
+          }
+          return decksCopy;
+        })
+      );
+    });
   }, []);
 
   return (
     <>
       <Navbar addNewDeck={() => addDeck()} />
       <div className="content-container">
-        {decks.map((deck, idx) => {
+        {Object.keys(decks).map((coinId, idx) => {
           return (
             <Deck
-              deckId={idx}
-              width="15%"
-              content={deck}
-              removeDeck={removeDeck}
-              key={`deck-${idx}`}
-            ></Deck>
+              key={`${idx}-deck`}
+              coinId={coinId}
+              tweets={decks[coinId].tweets}
+              coinData={decks[coinId].coinData}
+              loading={decks[coinId].loading}
+            />
           );
         })}
       </div>
